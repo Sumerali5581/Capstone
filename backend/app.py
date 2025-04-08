@@ -17,7 +17,7 @@ CORS(app)
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'root1234' #root1234
 app.config['MYSQL_DB'] = 'capstone'
-app.config['SECRET_KEY'] = 'scrypt:32768:8:1$kf6g3yPjaSR2JX38$6a20e784aa2c11b2f6724be339b52c2459a02468cbceb51fadd66b12aee1768847576e37bf3bf53ebc2198890638bbc136f539b433c96c9177ac716dad58a3ca'
+app.config['SECRET_KEY'] = ''
 
 
 mysql = MySQL(app)
