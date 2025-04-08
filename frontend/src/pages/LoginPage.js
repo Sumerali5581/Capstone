@@ -6,9 +6,9 @@ import {
 } from "@mui/material";
 
 const LoginPage = () => {
-  const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
+  //const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  //const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
@@ -17,7 +17,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   const handleMethodChange = (event, newValue) => {
-    setLoginMethod(newValue);
+    //setLoginMethod(newValue);
     setError("");
     setMessage("");
     setOtpSent(false);
@@ -76,42 +76,42 @@ const LoginPage = () => {
     }
   };
 
-  const handlePasswordLogin = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('http://localhost:5000/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+  // const handlePasswordLogin = async (e) => {
+  //   e.preventDefault();
+  //   try {
+  //     const response = await fetch('http://localhost:5000/api/login', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ email, password }),
+  //     });
 
-      const data = await response.json();
-      console.log('Login response:', data); // Debug log
+  //     const data = await response.json();
+  //     console.log('Login response:', data); // Debug log
       
-      if (response.ok && data.token) {
-        // Store the token in localStorage
-        localStorage.setItem('token', data.token);
-        console.log('Token stored, redirecting...'); // Debug log
+  //     if (response.ok && data.token) {
+  //       // Store the token in localStorage
+  //       localStorage.setItem('token', data.token);
+  //       console.log('Token stored, redirecting...'); // Debug log
         
-        // // Force a reload to update authentication state
-        // //window.location.href = '/dashboard';
-        // // Or alternatively:
-        // navigate('/dashboard');
-        // // window.location.reload();
-        setTimeout(() => {
-          navigate('/dashboard');
-          window.location.reload();  // Ensures re-render
-        }, 100);
-      } else {
-        setError(data.error || 'Login failed');
-      }
-    } catch (err) {
-      console.error('Login error:', err); // Debug log
-      setError('Network error occurred');
-    }
-  };
+  //       // // Force a reload to update authentication state
+  //       // //window.location.href = '/dashboard';
+  //       // // Or alternatively:
+  //       // navigate('/dashboard');
+  //       // // window.location.reload();
+  //       setTimeout(() => {
+  //         navigate('/dashboard');
+  //         window.location.reload();  // Ensures re-render
+  //       }, 100);
+  //     } else {
+  //       setError(data.error || 'Login failed');
+  //     }
+  //   } catch (err) {
+  //     console.error('Login error:', err); // Debug log
+  //     setError('Network error occurred');
+  //   }
+  // };
 
   return (
     <Container maxWidth="xs" sx={{ mt: 8 }}>
@@ -120,7 +120,7 @@ const LoginPage = () => {
           Login
         </Typography>
         
-        <Tabs
+        {/* <Tabs
           value={loginMethod}
           onChange={handleMethodChange}
           centered
@@ -128,7 +128,7 @@ const LoginPage = () => {
         >
           <Tab value="password" label="Password" />
           <Tab value="otp" label="OTP" />
-        </Tabs>
+        </Tabs> */}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -142,7 +142,8 @@ const LoginPage = () => {
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handlePasswordLogin}>
+        <Box> 
+          {/* component="form" onSubmit={handlePasswordLogin}> */}
           <TextField
             label="Email"
             variant="outlined"
@@ -152,7 +153,7 @@ const LoginPage = () => {
             onChange={(e) => setEmail(e.target.value)}
           />
 
-          {loginMethod === 'password' ? (
+          {/* {loginMethod === 'password' ? (
             <>
               <TextField
                 label="Password"
@@ -173,7 +174,8 @@ const LoginPage = () => {
                 Login with Password
               </Button>
             </>
-          ) : (
+          ) : ( */}
+          {(
             <>
               {!otpSent ? (
                 <Button

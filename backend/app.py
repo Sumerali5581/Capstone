@@ -13,11 +13,11 @@ app = Flask(__name__)
 CORS(app)
 
 # MySQL Configuration
-app.config['MYSQL_HOST'] = 'localhost'
+# app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'root1234' #root1234
 app.config['MYSQL_DB'] = 'capstone'
-app.config['SECRET_KEY'] = 'secret-key'
+app.config['SECRET_KEY'] = 'scrypt:32768:8:1$kf6g3yPjaSR2JX38$6a20e784aa2c11b2f6724be339b52c2459a02468cbceb51fadd66b12aee1768847576e37bf3bf53ebc2198890638bbc136f539b433c96c9177ac716dad58a3ca'
 
 
 mysql = MySQL(app)
@@ -28,7 +28,7 @@ otp_store = {}
 def send_otp_email(email, otp):
     # Configure your email settings
     sender_email = "disasterprediction37@gmail.com"
-    sender_password = "Your-password"
+    sender_password = "osibbsjgihevazwj"
     
     message = MIMEMultipart()
     message["From"] = sender_email
@@ -64,33 +64,33 @@ def token_required(f):
         return f(*args, **kwargs)
     return decorated
 
-@app.route('/api/login', methods=['POST'])
-def login():
-    try:
-        data = request.json
-        email = data.get('email')
-        password = data.get('password')
-
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT id FROM users WHERE email = %s AND password = %s", (email, password))
-        user = cur.fetchone()
-        cur.close()
-
-        if user:
-            token = jwt.encode({
-                'user_id': user[0],
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
-            },  app.config['SECRET_KEY'])
-            
-            return jsonify({
-                'message': 'Login successful',
-                'token': token
-            })
-        
-        return jsonify({'error': 'Invalid credentials'}), 401
-    except Exception as e:
-        print(f"Login error: {str(e)}")
-        return jsonify({'error': 'Server error occurred'}), 500
+# @app.route('/api/login', methods=['POST'])
+# def login():
+#     try:
+#         data = request.json
+#         email = data.get('email')
+#         password = data.get('password')
+#
+#         cur = mysql.connection.cursor()
+#         cur.execute("SELECT id FROM users WHERE email = %s AND password = %s", (email, password))
+#         user = cur.fetchone()
+#         cur.close()
+#
+#         if user:
+#             token = jwt.encode({
+#                 'user_id': user[0],
+#                 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+#             },  app.config['SECRET_KEY'])
+#
+#             return jsonify({
+#                 'message': 'Login successful',
+#                 'token': token
+#             })
+#
+#         return jsonify({'error': 'Invalid credentials'}), 401
+#     except Exception as e:
+#         print(f"Login error: {str(e)}")
+#         return jsonify({'error': 'Server error occurred'}), 500
 
 @app.route('/api/check-auth', methods=['GET'])
 @token_required
