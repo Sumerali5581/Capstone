@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Typography, Box, Button } from '@mui/material';
+import { Container, Typography, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import Navbar from './Navbar';
 
 const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -18,7 +19,7 @@ const DashboardPage = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           handleLogout();
@@ -26,7 +27,7 @@ const DashboardPage = () => {
         }
         throw new Error('Failed to fetch dashboard data');
       }
-      
+
       const data = await response.json();
       setDashboardData(data);
     } catch (error) {
@@ -38,38 +39,28 @@ const DashboardPage = () => {
   };
 
   const handleLogout = () => {
-    // Clear the token from localStorage
     localStorage.removeItem('token');
-    
-    // Force a reload and redirect to login
     window.location.href = '/login';
-    // Or alternatively:
-    // navigate('/login');
-    // window.location.reload();
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Dashboard
-        </Typography>
-        <Button 
-          variant="contained" 
-          color="secondary" 
-          onClick={handleLogout}
-          sx={{ mb: 3 }}
-        >
-          Logout
-        </Button>
-        {dashboardData && (
-          <Typography>
-            {/* Display your dashboard data here */}
-            Welcome to your dashboard!
+    <div className="dashboard-page" style={{ backgroundColor: '#f0f0f0', height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <Box >
+      <Navbar />
+      <Container maxWidth="lg">
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h4" gutterBottom>
+            Dashboard
           </Typography>
-        )}
-      </Box>
-    </Container>
+          {dashboardData && (
+            <Typography>
+              Welcome to your dashboard!
+            </Typography>
+          )}
+        </Box>
+      </Container>
+    </Box>
+    </div>
   );
 };
 

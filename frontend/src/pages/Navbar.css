@@ -1,0 +1,81 @@
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #1e1e1e;
+    padding: 10px;
+    gap: 28px;
+    border-radius: 10px;
+    z-index: 1;
+  }
+  
+  .navbar li {
+    position: relative;
+    list-style: none;
+    width: 72px;
+    height: 50px;
+    border-radius: 72px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px #fff;
+    transition: 300ms;
+  }
+  
+  .navbar li:hover {
+    width: 180px;
+    box-shadow: 0 0 0 2px var(--bg-color);
+  }
+  
+  .navbar li::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 32px;
+    background: var(--bg-color);
+    opacity: 0;
+    transition: 300ms;
+  }
+  
+  .navbar li:hover::before {
+    opacity: 1;
+  }
+  
+  .navbar li span {
+    position: absolute;
+  }
+  
+  .navbar li .text {
+    color: #1e1e1e;
+    font-size: 1.5em;
+    z-index: 1;
+    text-transform: uppercase;
+    font-weight: 400;
+    letter-spacing: 0.024em;
+    opacity: 0;
+    transition: 300ms;
+    letter-spacing: -0.125px;
+  }
+  
+  .navbar li:hover .text {
+    opacity: 1;
+  }
+  
+  .navbar li .icon {
+    font-size: 2em;
+    transition: 300ms;
+    transition-delay: 150ms;
+    color: #fff;
+  }
+  
+  .navbar li:hover .icon {
+    transform: scale(0);
+    transition-delay: 0s;
+  }
+  

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect } from 'react';
 import DashboardPage from './pages/DashboardPage';
 import LoginForm from './pages/LoginForm';
+import CustomNavbar1 from './pages/Navbar';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -43,6 +44,7 @@ function App() {
   return (
     <Router>
       <Routes>
+      
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginForm />} 
