@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect } from 'react';
 import DashboardPage from './pages/DashboardPage';
 import LoginForm from './pages/LoginForm';
+import CriminalDetection from './pages/CriminalDetection';
+import CrowdCountingPage from './pages/CrowdCountingPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -52,13 +54,30 @@ function App() {
           path="/dashboard" 
           element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} 
         />
-        <Route 
+        {/* <Route 
           path="/" 
           element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} 
+        /> */}
+        <Route
+          path='/'
+          element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />}
         />
+
+        <Route
+          path='/crowd-counting'
+          element={isAuthenticated ? <CrowdCountingPage/> : <Navigate to="/login" />}
+        />
+
+        <Route
+          path='/criminal-detection'
+          element={<CriminalDetection/>}
+        />
+
       </Routes>
     </Router>
+
   );
+  
 }
 
 export default App;

@@ -1,4 +1,23 @@
-from flask import Flask, request, jsonify
+# from flask import Flask, request, jsonify, render_template, Response, redirect
+# from flask_cors import CORS
+# from flask_mysqldb import MySQL
+# import jwt
+# import datetime
+# from functools import wraps
+# import random
+# import smtplib
+# from email.mime.text import MIMEText
+# from email.mime.multipart import MIMEMultipart
+
+# # Criminal detection dependencies
+# import os, cv2, threading
+# import numpy as np
+# from PIL import Image
+# from facenet_pytorch import MTCNN, InceptionResnetV1
+# from sklearn.metrics.pairwise import cosine_similarity
+# import torch
+
+from flask import Flask, request, jsonify, render_template, Response, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from flask_mysqldb import MySQL
 import jwt
@@ -8,22 +27,354 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import os
+import cv2
+import threading
+import numpy as np
+from PIL import Image
+from facenet_pytorch import MTCNN, InceptionResnetV1
+from sklearn.metrics.pairwise import cosine_similarity
+import torch
+from ultralytics import YOLO
+import supervision as sv  # DeepSORT Tracking (ByteTrack)
+from werkzeug.utils import secure_filename
+
+
+  
 
 app = Flask(__name__)
 CORS(app)
 
 # MySQL Configuration
-# app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_HOST'] = ''
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'root1234' #root1234
 app.config['MYSQL_DB'] = 'capstone'
 app.config['SECRET_KEY'] = ''
 
-
 mysql = MySQL(app)
 
 # Store OTPs temporarily (in production, use Redis or similar)
 otp_store = {}
+
+# ----------------------
+# Detection Setup
+UPLOAD_FOLDER = 'uploads'
+KNOWN_FOLDER = 'known_faces'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(KNOWN_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config["ALLOWED_EXTENSIONS"] = {"mp4", "avi", "mov", "mkv"}
+app.config['OUTPUT_FOLDER'] = 'static'
+os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
+crowd_video_path = ""
+
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+mtcnn = MTCNN(image_size=160, margin=20, keep_all=True, device=device)
+resnet = InceptionResnetV1(pretrained='vggface2').eval().to(device)
+
+known_embeddings = []
+known_names = []
+output_frame = None
+video_path = None
+use_webcam = False
+lock = threading.Lock()
+
+# Load YOLOv8 model (high accuracy version)
+crowd_model = YOLO("yolov8x.pt")  # Extra-large model for better detection
+
+crowd_lock = threading.Lock()
+crowd_output_frame = None
+
+# Initialize DeepSORT Tracker
+tracker = sv.ByteTrack()
+
+# Global variable for uploaded video path
+crowd_video_path = None
+
+# Check if the uploaded file is allowed
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
+
+
+# @app.route("/api/crowd-count/upload", methods=["POST"])
+# def upload_crowd_video():
+#     global crowd_video_path
+#     if "video" not in request.files:
+#         return jsonify({"error": "No file part"}), 400
+#     file = request.files["video"]
+#     if file.filename == "":
+#         return jsonify({"error": "No selected file"}), 400
+#     if not allowed_file(file.filename):
+#         return jsonify({"error": "Invalid file type"}), 400
+#     filename = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+#     file.save(filename)
+#     crowd_video_path = filename
+#     threading.Thread(target=count_crowd, daemon=True).start()
+#     return jsonify({"message": "Video uploaded successfully"}), 200
+
+@app.route('/api/crowd-count/upload', methods=['POST'])
+def upload_video():
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video part'}), 400
+
+    video = request.files['video']
+    if video.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    filename = secure_filename(video.filename)
+    input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    video.save(input_path)
+
+    # Process the video and save to OUTPUT_FOLDER as processed_output.mp4
+    output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'processed_output.mp4')
+    process_video(input_path, output_path)
+
+    return jsonify({'message': 'Video processed successfully'}), 200
+
+def count_crowd():
+    global crowd_video_path
+    cap = cv2.VideoCapture(crowd_video_path)
+
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success:
+            break
+
+        # Run YOLO model
+        results = crowd_model(frame, conf=0.1)
+        if isinstance(results, list):
+            results = results[0]
+
+        # Convert YOLO results into Supervision detections
+        detections = sv.Detections.from_ultralytics(results)
+
+        # Filter detections for 'person' class only (COCO class ID 0)
+        person_detections = detections[detections.class_id == 0]
+
+        # Ensure detections are passed correctly to tracker
+        if len(person_detections) > 0:
+            tracked_objects = tracker.update_with_detections(person_detections)
+        else:
+            tracked_objects = []
+
+        # Count number of people
+        count = len(tracked_objects)
+
+        # Draw bounding boxes
+        for obj in tracked_objects:
+            x1, y1, x2, y2 = map(int, obj[0])  # Extract bbox
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box for people
+
+        # Display People Count
+        cv2.putText(frame, f"People Count: {count}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        # Save or display frame here for the frontend
+        # You can implement frame streaming as done in the criminal detection section
+
+    cap.release()
+
+# @app.route('/api/crowd-count/video_feed')
+# def crowd_video_feed():
+#     def generate_frames():
+#         global crowd_video_path
+#         cap = cv2.VideoCapture(crowd_video_path)
+#         while cap.isOpened():
+#             success, frame = cap.read()
+#             if not success:
+#                 break
+#             ret, buffer = cv2.imencode('.jpg', frame)
+#             frame = buffer.tobytes()
+#             yield (b'--frame\r\n'
+#                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+#         cap.release()
+#     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+# @app.route('/api/crowd-count/video_feed')
+# def crowd_video_feed():
+#     def generate_frames():
+#         while True:
+#             with crowd_lock:
+#                 if crowd_output_frame is None:
+#                     continue
+#                 ret, buffer = cv2.imencode('.jpg', crowd_output_frame)
+#                 frame = buffer.tobytes()
+#             yield (b'--frame\r\n'
+#                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+#     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route('/api/crowd-count/video_feed')
+def crowd_video_feed():
+    return send_from_directory(app.config['OUTPUT_FOLDER'], 'processed_output.mp4')
+
+def process_video(input_path, output_path):
+    cap = cv2.VideoCapture(input_path)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Example crowd counting logic (dummy counter here)
+        crowd_count = 42  # Replace with actual logic
+        cv2.putText(frame, f'Crowd Count: {crowd_count}', (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+        out.write(frame)
+
+    cap.release()
+    out.release()
+
+#------------------------------------
+
+
+def load_known_faces():
+    known_embeddings.clear()
+    known_names.clear()
+    for filename in os.listdir(KNOWN_FOLDER):
+        path = os.path.join(KNOWN_FOLDER, filename)
+        name, _ = os.path.splitext(filename)
+        img = Image.open(path).convert('RGB')
+        face = mtcnn(img)
+        if face is not None:
+            if face.ndim == 3:
+                face = face.unsqueeze(0)
+            face = face.to(device)
+            embedding = resnet(face).detach().cpu().numpy()
+            known_embeddings.append(embedding)
+            known_names.append(name)
+
+load_known_faces()
+
+
+# def count_crowd():
+#     global crowd_video_path, crowd_use_webcam, crowd_output_frame
+#     cap = cv2.VideoCapture(0 if crowd_use_webcam else crowd_video_path)
+
+#     while cap.isOpened() and (crowd_use_webcam or crowd_video_path):
+#         success, frame = cap.read()
+#         if not success:
+#             break
+
+#         results = crowd_model.track(frame, persist=True, tracker="bytetrack.yaml")[0]
+#         boxes = results.boxes.xyxy.cpu().numpy() if results.boxes else []
+#         total_people = len(boxes)
+
+#         # Draw bounding boxes
+#         for box in boxes:
+#             x1, y1, x2, y2 = map(int, box)
+#             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+
+#         # Show count
+#         cv2.putText(frame, f"Count: {total_people}", (10, 30),
+#                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
+#         with crowd_lock:
+#             crowd_output_frame = frame.copy()
+
+#     cap.release()
+
+
+def match_face(face_tensor):
+    if face_tensor.ndim == 3:
+        face_tensor = face_tensor.unsqueeze(0)
+    face_tensor = face_tensor.to(device)
+    embedding = resnet(face_tensor).detach().cpu().numpy()
+    identity = "Unknown"
+    max_sim = 0.7
+    for known_embedding, name in zip(known_embeddings, known_names):
+        sim = cosine_similarity(embedding, known_embedding)[0][0]
+        if sim > max_sim:
+            max_sim = sim
+            identity = name
+    return identity
+
+# def detect_faces():
+#     global video_path, use_webcam, output_frame
+#     cap = cv2.VideoCapture(0 if use_webcam else video_path)
+#     process_interval = 5
+#     frame_count = 0
+#     last_boxes = []
+#     last_names = []
+#     while cap.isOpened():
+#         success, frame = cap.read()
+#         if not success:
+#             break
+#         frame_count += 1
+#         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#         if frame_count % process_interval == 0:
+#             img_pil = Image.fromarray(rgb)
+#             boxes, _ = mtcnn.detect(img_pil)
+#             last_boxes = boxes
+#             last_names = []
+#             if boxes is not None:
+#                 faces = mtcnn(img_pil)
+#                 for i, box in enumerate(boxes):
+#                     if faces is None or i >= len(faces):
+#                         last_names.append("Unknown")
+#                         continue
+#                     name = match_face(faces[i])
+#                     last_names.append(name)
+#         if last_boxes is not None:
+#             for i, box in enumerate(last_boxes):
+#                 if i >= len(last_names):
+#                     continue
+#                 name = last_names[i]
+#                 x1, y1, x2, y2 = map(int, box)
+#                 color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
+#                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+#                 cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+#         with lock:
+#             output_frame = frame.copy()
+#     cap.release()
+def detect_faces():
+    global video_path, use_webcam, output_frame
+    cap = cv2.VideoCapture(0 if use_webcam else video_path)
+    process_interval = 5
+    frame_count = 0
+    last_boxes = []
+    last_names = []
+    while cap.isOpened() and (use_webcam or video_path):
+  # Add check to stop if use_webcam is False
+        success, frame = cap.read()
+        if not success:
+            break
+        frame_count += 1
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if frame_count % process_interval == 0:
+            img_pil = Image.fromarray(rgb)
+            boxes, _ = mtcnn.detect(img_pil)
+            last_boxes = boxes
+            last_names = []
+            if boxes is not None:
+                faces = mtcnn(img_pil)
+                for i, box in enumerate(boxes):
+                    if faces is None or i >= len(faces):
+                        last_names.append("Unknown")
+                        continue
+                    name = match_face(faces[i])
+                    last_names.append(name)
+        if last_boxes is not None:
+            for i, box in enumerate(last_boxes):
+                if i >= len(last_names):
+                    continue
+                name = last_names[i]
+                x1, y1, x2, y2 = map(int, box)
+                color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+        with lock:
+            output_frame = frame.copy()
+    cap.release()
+
+# ----------------------------------------  
 
 def send_otp_email(email, otp):
     # Configure your email settings
@@ -196,6 +547,55 @@ def verify_otp():
     except Exception as e:
         print(f"OTP verification error: {str(e)}")
         return jsonify({'error': 'Server error occurred'}), 500
+    
+#-------------
+@app.route('/api/criminal-detection', methods=['GET', 'POST'])
+def criminal_index():
+    global video_path, use_webcam
+    if request.method == 'POST':
+        if 'video' in request.files:
+            file = request.files['video']
+            if file.filename == '':
+                return redirect(request.url)
+            filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+            file.save(filepath)
+            video_path = filepath
+            use_webcam = False
+            threading.Thread(target=detect_faces, daemon=True).start()
+            return redirect('/api/criminal-detection/video_feed')
+    return "<h3>Upload video via POST or click to start webcam</h3>"
+
+@app.route('/api/criminal-detection/start_webcam', methods=['POST'])
+def start_webcam():
+    global use_webcam, video_path
+    use_webcam = True
+    video_path = None
+    threading.Thread(target=detect_faces, daemon=True).start()
+    return redirect('/api/criminal-detection/video_feed')
+
+@app.route('/api/criminal-detection/video_feed')
+def video_feed():
+    def generate_frames():
+        global output_frame
+        while True:
+            with lock:
+                if output_frame is None:
+                    continue
+                frame = output_frame.copy()
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+@app.route('/api/criminal-detection/stop_webcam', methods=['POST'])
+def stop_webcam():
+    global use_webcam
+    use_webcam = False
+    return jsonify({"status": "Webcam stopped"}), 200
+
+#------------------
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
