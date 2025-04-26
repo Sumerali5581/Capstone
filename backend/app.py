@@ -20,6 +20,7 @@
 from flask import Flask, request, jsonify, render_template, Response, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from flask_mysqldb import MySQL
+from flask_mail import Mail, Message
 import jwt
 import datetime
 from functools import wraps
@@ -51,6 +52,14 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'root1234' #root1234
 app.config['MYSQL_DB'] = 'capstone'
 app.config['SECRET_KEY'] = ''
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Use your email service provider's SMTP server
+app.config['MAIL_PORT'] = 587  # Port for outgoing email
+app.config['MAIL_USE_TLS'] = True  # Use TLS encryption
+app.config['MAIL_USERNAME'] = 'disasterprediction37@gmail.com'  # Your email address
+app.config['MAIL_PASSWORD'] = ""  # Your email password
+
+mail = Mail(app)
 
 mysql = MySQL(app)
 
@@ -334,52 +343,61 @@ def match_face(face_tensor):
 #         with lock:
 #             output_frame = frame.copy()
 #     cap.release()
+
+
+detection_running = False
+
+
 def detect_faces():
-    global video_path, use_webcam, output_frame
-    cap = cv2.VideoCapture(0 if use_webcam else video_path)
-    process_interval = 5
-    frame_count = 0
-    last_boxes = []
-    last_names = []
-    while cap.isOpened() and (use_webcam or video_path):
-  # Add check to stop if use_webcam is False
-        success, frame = cap.read()
-        if not success:
-            break
-        frame_count += 1
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        if frame_count % process_interval == 0:
-            img_pil = Image.fromarray(rgb)
-            boxes, _ = mtcnn.detect(img_pil)
-            last_boxes = boxes
-            last_names = []
-            if boxes is not None:
-                faces = mtcnn(img_pil)
-                for i, box in enumerate(boxes):
-                    if faces is None or i >= len(faces):
-                        last_names.append("Unknown")
+    try:
+        global video_path, use_webcam, output_frame, detection_running
+        detection_running = True
+        cap = cv2.VideoCapture(0 if use_webcam else video_path)
+        process_interval = 5
+        frame_count = 0
+        last_boxes = []
+        last_names = []
+        while cap.isOpened() and (use_webcam or video_path):
+        #Add check to stop if use_webcam is False
+            success, frame = cap.read()
+            if not success:
+                break
+            frame_count += 1
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if frame_count % process_interval == 0:
+                img_pil = Image.fromarray(rgb)
+                boxes, _ = mtcnn.detect(img_pil)
+                last_boxes = boxes
+                last_names = []
+                if boxes is not None:
+                    faces = mtcnn(img_pil)
+                    for i, box in enumerate(boxes):
+                        if faces is None or i >= len(faces):
+                            last_names.append("Unknown")
+                            continue
+                        name = match_face(faces[i])
+                        last_names.append(name)
+            if last_boxes is not None:
+                for i, box in enumerate(last_boxes):
+                    if i >= len(last_names):
                         continue
-                    name = match_face(faces[i])
-                    last_names.append(name)
-        if last_boxes is not None:
-            for i, box in enumerate(last_boxes):
-                if i >= len(last_names):
-                    continue
-                name = last_names[i]
-                x1, y1, x2, y2 = map(int, box)
-                color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        with lock:
-            output_frame = frame.copy()
-    cap.release()
+                    name = last_names[i]
+                    x1, y1, x2, y2 = map(int, box)
+                    color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+            with lock:
+                output_frame = frame.copy()
+        cap.release()
+    except Exception as e:
+        print(f"Error in detection: {str(e)}")
 
 # ----------------------------------------  
 
 def send_otp_email(email, otp):
     # Configure your email settings
     sender_email = "disasterprediction37@gmail.com"
-    sender_password = "osibbsjgihevazwj"
+    sender_password = ""
     
     message = MIMEMultipart()
     message["From"] = sender_email
@@ -561,7 +579,9 @@ def criminal_index():
             file.save(filepath)
             video_path = filepath
             use_webcam = False
+            print("Till this point")
             threading.Thread(target=detect_faces, daemon=True).start()
+            print(f"Threads {threading}")
             return redirect('/api/criminal-detection/video_feed')
     return "<h3>Upload video via POST or click to start webcam</h3>"
 
@@ -577,7 +597,7 @@ def start_webcam():
 def video_feed():
     def generate_frames():
         global output_frame
-        while True:
+        while True and detection_running:
             with lock:
                 if output_frame is None:
                     continue
@@ -586,12 +606,46 @@ def video_feed():
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-    
+
 @app.route('/api/criminal-detection/stop_webcam', methods=['POST'])
 def stop_webcam():
     global use_webcam
     use_webcam = False
     return jsonify({"status": "Webcam stopped"}), 200
+
+@app.route('/api/criminal-detection/stop', methods=['POST'])
+def stop_detection():
+    global detection_running
+    detection_running = False
+    return jsonify({'message': 'Criminal detection stopped'}), 200
+
+
+@app.route('/smtp_form', methods=['POST'])
+def feedback():
+    name = ""
+    email = ""
+    message = ""
+    if request.method == 'POST':
+        # Receiving data from the frontend
+        name = request.json.get('name')
+        email = request.json.get('email')
+        message = request.json.get('message')
+
+    student_email = ['aishwarya.bangar@mitaoe.ac.in', 'shubhan.ansari@mitaoe.ac.in', 'visharad.baderao@mitaoe.ac.in']
+
+    # You can use the 'name' and 'email' fields to create a more personalized subject.
+    subject = f"Feedback from {name} ({email})"
+
+    msg = Message(subject, sender='your_email@gmail.com', recipients=student_email)
+    msg.body = message
+
+    try:
+        mail.send(msg)
+        return jsonify({'message': 'Email sent successfully!'}), 200
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        return jsonify({'error': 'Failed to send email'}), 500
+
 
 #------------------
 

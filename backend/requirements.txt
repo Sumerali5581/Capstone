@@ -1,0 +1,13 @@
+Flask
+flask-cors
+flask-mysqldb
+PyJWT
+opencv-python
+Pillow
+torch
+facenet-pytorch
+ultralytics
+supervision
+scikit-learn
+numpy
+Werkzeug
