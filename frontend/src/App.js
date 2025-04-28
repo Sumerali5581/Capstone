@@ -71,6 +71,11 @@ function App() {
           element={isAuthenticated ? <CriminalDetection/> : <Navigate to="/login" />}
         />
 
+        <Route
+          path='/dummy'
+          element={<CriminalDetection />}
+        />
+
         <Route 
           path="/about" 
           element={isAuthenticated ? <About /> : <Navigate to="/login" />} 
@@ -80,6 +85,8 @@ function App() {
           path="/contact" 
           element={isAuthenticated ? <Contact /> : <Navigate to="/login" />} 
         />
+
+        
 
       </Routes>
     </Router>

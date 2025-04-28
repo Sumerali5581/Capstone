@@ -1,6 +1,7 @@
 Flask
 flask-cors
 flask-mysqldb
+Flask-Mail
 PyJWT
 opencv-python
 Pillow
