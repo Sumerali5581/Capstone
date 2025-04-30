@@ -49,17 +49,17 @@ app = Flask(__name__, static_folder="../frontend/build", static_url_path="/")
 CORS(app)
 
 # MySQL Configuration
-app.config['MYSQL_HOST'] = 'database-1.cfsyy62gqoaj.ap-south-1.rds.amazonaws.com'
+app.config['MYSQL_HOST'] = ''
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'root1234' #root1234
 app.config['MYSQL_DB'] = 'capstone'
-app.config['SECRET_KEY'] = 'a8d649dbedd2240b9dfa187aac870a52283925f09adecccfb47fe617416afb1c'
+app.config['SECRET_KEY'] = ''
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Use your email service provider's SMTP server
 app.config['MAIL_PORT'] = 587  # Port for outgoing email
 app.config['MAIL_USE_TLS'] = True  # Use TLS encryption
 app.config['MAIL_USERNAME'] = 'disasterprediction37@gmail.com'  # Your email address
-app.config['MAIL_PASSWORD'] = "osibbsjgihevazwj"  # Your email password
+app.config['MAIL_PASSWORD'] = ""  # Your email password
 
 mail = Mail(app)
 
