@@ -4,6 +4,8 @@ import DashboardPage from './pages/DashboardPage';
 import LoginForm from './pages/LoginForm';
 import CriminalDetection from './pages/CriminalDetection';
 import CrowdCountingPage from './pages/CrowdCountingPage';
+import About from './pages/About';
+import Contact from './pages/Contact';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -54,13 +56,9 @@ function App() {
           path="/dashboard" 
           element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} 
         />
-        {/* <Route 
+        <Route 
           path="/" 
           element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} 
-        /> */}
-        <Route
-          path='/'
-          element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />}
         />
 
         <Route
@@ -70,8 +68,25 @@ function App() {
 
         <Route
           path='/criminal-detection'
-          element={<CriminalDetection/>}
+          element={isAuthenticated ? <CriminalDetection/> : <Navigate to="/login" />}
         />
+
+        <Route
+          path='/dummy'
+          element={<CriminalDetection />}
+        />
+
+        <Route 
+          path="/about" 
+          element={isAuthenticated ? <About /> : <Navigate to="/login" />} 
+        />
+
+        <Route 
+          path="/contact" 
+          element={isAuthenticated ? <Contact /> : <Navigate to="/login" />} 
+        />
+
+        
 
       </Routes>
     </Router>

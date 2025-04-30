@@ -20,6 +20,7 @@
 from flask import Flask, request, jsonify, render_template, Response, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from flask_mysqldb import MySQL
+from flask_mail import Mail, Message
 import jwt
 import datetime
 from functools import wraps
@@ -38,11 +39,13 @@ import torch
 from ultralytics import YOLO
 import supervision as sv  # DeepSORT Tracking (ByteTrack)
 from werkzeug.utils import secure_filename
+import time
 
 
-  
 
-app = Flask(__name__)
+
+# app = Flask(__name__)
+app = Flask(__name__, static_folder="../frontend/build", static_url_path="/")
 CORS(app)
 
 # MySQL Configuration
@@ -51,6 +54,14 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'root1234' #root1234
 app.config['MYSQL_DB'] = 'capstone'
 app.config['SECRET_KEY'] = ''
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Use your email service provider's SMTP server
+app.config['MAIL_PORT'] = 587  # Port for outgoing email
+app.config['MAIL_USE_TLS'] = True  # Use TLS encryption
+app.config['MAIL_USERNAME'] = 'disasterprediction37@gmail.com'  # Your email address
+app.config['MAIL_PASSWORD'] = ""  # Your email password
+
+mail = Mail(app)
 
 mysql = MySQL(app)
 
@@ -334,61 +345,74 @@ def match_face(face_tensor):
 #         with lock:
 #             output_frame = frame.copy()
 #     cap.release()
-def detect_faces():
-    global video_path, use_webcam, output_frame
-    cap = cv2.VideoCapture(0 if use_webcam else video_path)
-    process_interval = 5
-    frame_count = 0
-    last_boxes = []
-    last_names = []
-    while cap.isOpened() and (use_webcam or video_path):
-  # Add check to stop if use_webcam is False
-        success, frame = cap.read()
-        if not success:
-            break
-        frame_count += 1
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        if frame_count % process_interval == 0:
-            img_pil = Image.fromarray(rgb)
-            boxes, _ = mtcnn.detect(img_pil)
-            last_boxes = boxes
-            last_names = []
-            if boxes is not None:
-                faces = mtcnn(img_pil)
-                for i, box in enumerate(boxes):
-                    if faces is None or i >= len(faces):
-                        last_names.append("Unknown")
-                        continue
-                    name = match_face(faces[i])
-                    last_names.append(name)
-        if last_boxes is not None:
-            for i, box in enumerate(last_boxes):
-                if i >= len(last_names):
-                    continue
-                name = last_names[i]
-                x1, y1, x2, y2 = map(int, box)
-                color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        with lock:
-            output_frame = frame.copy()
-    cap.release()
 
-# ----------------------------------------  
+
+detection_running = False
+
+
+def detect_faces():
+    try:
+        global video_path, use_webcam, output_frame, detection_running
+        detection_running = True
+        cap = cv2.VideoCapture(0 if use_webcam else video_path)
+        process_interval = 5
+        frame_count = 0
+        last_boxes = []
+        last_names = []
+        if not use_webcam:
+            while not cap.isOpened():
+                pass  # wait until video is opened
+        while cap.isOpened() and (use_webcam or video_path) and detection_running:
+        #Add check to stop if use_webcam is False
+            success, frame = cap.read()
+            if not success:
+                break
+            frame_count += 1
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if frame_count % process_interval == 0:
+                img_pil = Image.fromarray(rgb)
+                boxes, _ = mtcnn.detect(img_pil)
+                last_boxes = boxes
+                last_names = []
+                if boxes is not None:
+                    faces = mtcnn(img_pil)
+                    for i, box in enumerate(boxes):
+                        if faces is None or i >= len(faces):
+                            last_names.append("Unknown")
+                            continue
+                        name = match_face(faces[i])
+                        last_names.append(name)
+            if last_boxes is not None:
+                for i, box in enumerate(last_boxes):
+                    if i >= len(last_names):
+                        continue
+                    name = last_names[i]
+                    x1, y1, x2, y2 = map(int, box)
+                    color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+            with lock:
+                output_frame = frame.copy()
+        cap.release()
+        #detection_running = False
+    except Exception as e:
+        print(f"Error in detection: {str(e)}")
+
+# ----------------------------------------
 
 def send_otp_email(email, otp):
     # Configure your email settings
     sender_email = "disasterprediction37@gmail.com"
     sender_password = "osibbsjgihevazwj"
-    
+
     message = MIMEMultipart()
     message["From"] = sender_email
     message["To"] = email
     message["Subject"] = "Login OTP"
-    
+
     body = f"Your OTP for login is: {otp}"
     message.attach(MIMEText(body, "plain"))
-    
+
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
@@ -458,35 +482,35 @@ def request_otp():
     try:
         data = request.json
         email = data.get('email')
-        
+
         if not email:
             return jsonify({'error': 'Email is required'}), 400
-            
+
         # Check if email exists in database
         cur = mysql.connection.cursor()
         cur.execute("SELECT id FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
-        
+
         if not user:
             return jsonify({'error': 'No user found with this email'}), 404
-            
+
         # Generate 6-digit OTP
         otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        
+
         # Store OTP with timestamp
         otp_store[email] = {
             'otp': otp,
             'timestamp': datetime.datetime.utcnow(),
             'attempts': 0
         }
-        
+
         # Send OTP via email
         if send_otp_email(email, otp):
             return jsonify({'message': 'OTP sent successfully'})
         else:
             return jsonify({'error': 'Failed to send OTP'}), 500
-            
+
     except Exception as e:
         print(f"OTP request error: {str(e)}")
         return jsonify({'error': 'Server error occurred'}), 500
@@ -497,57 +521,57 @@ def verify_otp():
         data = request.json
         email = data.get('email')
         submitted_otp = data.get('otp')
-        
+
         if not email or not submitted_otp:
             return jsonify({'error': 'Email and OTP are required'}), 400
-            
+
         # Check if OTP exists and is valid
         otp_data = otp_store.get(email)
         if not otp_data:
             return jsonify({'error': 'No OTP request found'}), 400
-            
+
         # Check OTP expiry (5 minutes)
         time_diff = datetime.datetime.utcnow() - otp_data['timestamp']
         if time_diff.total_seconds() > 300:  # 5 minutes
             del otp_store[email]
             return jsonify({'error': 'OTP expired'}), 400
-            
+
         # Check attempts
         if otp_data['attempts'] >= 3:
             del otp_store[email]
             return jsonify({'error': 'Too many attempts'}), 400
-            
+
         # Increment attempts
         otp_data['attempts'] += 1
-        
+
         # Verify OTP
         if submitted_otp != otp_data['otp']:
             return jsonify({'error': 'Invalid OTP'}), 401
-            
+
         # OTP is valid - get user details and generate token
         cur = mysql.connection.cursor()
         cur.execute("SELECT id FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
-        
+
         # Generate JWT token
         token = jwt.encode({
             'user_id': user[0],
             'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
         }, app.config['SECRET_KEY'])
-        
+
         # Clear OTP data
         del otp_store[email]
-        
+
         return jsonify({
             'message': 'Login successful',
             'token': token
         })
-        
+
     except Exception as e:
         print(f"OTP verification error: {str(e)}")
         return jsonify({'error': 'Server error occurred'}), 500
-    
+
 #-------------
 @app.route('/api/criminal-detection', methods=['GET', 'POST'])
 def criminal_index():
@@ -561,7 +585,15 @@ def criminal_index():
             file.save(filepath)
             video_path = filepath
             use_webcam = False
+            print("Till this point")
             threading.Thread(target=detect_faces, daemon=True).start()
+            print(f"Threads {threading}")
+            import time
+            timeout = 10  # seconds
+            start_time = time.time()
+            while output_frame is None and (time.time() - start_time) < timeout:
+                time.sleep(0.1)
+
             return redirect('/api/criminal-detection/video_feed')
     return "<h3>Upload video via POST or click to start webcam</h3>"
 
@@ -580,22 +612,70 @@ def video_feed():
         while True:
             with lock:
                 if output_frame is None:
+                    time.sleep(0.1)
                     continue
                 frame = output_frame.copy()
-            _, buffer = cv2.imencode('.jpg', frame)
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if not ret:
+                continue
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-    
+
 @app.route('/api/criminal-detection/stop_webcam', methods=['POST'])
 def stop_webcam():
     global use_webcam
     use_webcam = False
     return jsonify({"status": "Webcam stopped"}), 200
 
+@app.route('/api/criminal-detection/stop', methods=['POST'])
+def stop_detection():
+    global detection_running
+    detection_running = False
+    return jsonify({'message': 'Criminal detection stopped'}), 200
+
+
+@app.route('/smtp_form', methods=['POST'])
+def feedback():
+    name = ""
+    email = ""
+    message = ""
+    if request.method == 'POST':
+        # Receiving data from the frontend
+        name = request.json.get('name')
+        email = request.json.get('email')
+        message = request.json.get('message')
+
+    student_email = ['aishwarya.bangar@mitaoe.ac.in', 'shubhan.ansari@mitaoe.ac.in', 'visharad.baderao@mitaoe.ac.in']
+
+    # You can use the 'name' and 'email' fields to create a more personalized subject.
+    subject = f"Feedback from {name} ({email})"
+
+    msg = Message(subject, sender='your_email@gmail.com', recipients=student_email)
+    msg.body = message
+
+    try:
+        mail.send(msg)
+        return jsonify({'message': 'Email sent successfully!'}), 200
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        return jsonify({'error': 'Failed to send email'}), 500
+
+
 #------------------
 
 
+# Route to serve React frontend
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
+
+# if __name__ == '__main__':
+#     app.run(debug=True)

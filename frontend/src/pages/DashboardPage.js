@@ -1,110 +1,54 @@
-// import React, { useEffect, useState } from 'react';
-// import { Container, Typography, Box, Card, CardContent, CardActions, Button, Grid } from '@mui/material';
+// import React from 'react';
 // import { useNavigate } from 'react-router-dom';
 // import Navbar from './Navbar';
 
 // const DashboardPage = () => {
-//   const [dashboardData, setDashboardData] = useState(null);
 //   const navigate = useNavigate();
 
-//   useEffect(() => {
-//     fetchDashboardData();
-//   }, []);
-
-//   const fetchDashboardData = async () => {
-//     try {
-//       const token = localStorage.getItem('token');
-//       const response = await fetch('http://localhost:5000/api/dashboard-data', {
-//         headers: {
-//           'Authorization': `Bearer ${token}`
-//         }
-//       });
-
-//       if (!response.ok) {
-//         if (response.status === 401) {
-//           handleLogout();
-//           return;
-//         }
-//         throw new Error('Failed to fetch dashboard data');
-//       }
-
-//       const data = await response.json();
-//       setDashboardData(data);
-//     } catch (error) {
-//       console.error('Error:', error);
-//       if (error.message.includes('Token is invalid')) {
-//         handleLogout();
-//       }
-//     }
-//   };
-
-//   const handleLogout = () => {
-//     localStorage.removeItem('token');
-//     window.location.href = '/login';
-//   };
-
 //   return (
-//     <div className="dashboard-page" style={{ backgroundColor: '#f0f0f0', minHeight: '100vh', width: '100vw' }}>
+//     <div className="bg-gray-100 min-h-screen w-full">
 //       <Navbar />
-//       <Container maxWidth="lg">
-//         <Box sx={{ mt: 4 }}>
-//           <Typography variant="h4" gutterBottom>
-//             Dashboard
-//           </Typography>
-//           {dashboardData && (
-//             <Typography variant="h6" gutterBottom>
-//               Welcome to your dashboard!
-//             </Typography>
-//           )}
-//           <Grid container spacing={3} sx={{ mt: 2 }}>
-//             {/* Crowd Counting Card */}
-//             <Grid item xs={12} sm={6}>
-//               <Card>
-//                 <CardContent>
-//                   <Typography variant="h5" component="div">
-//                     Crowd Counting
-//                   </Typography>
-//                   <Typography variant="body2" color="text.secondary">
-//                     Access the crowd counting module using AI-based surveillance.
-//                   </Typography>
-//                 </CardContent>
-//                 <CardActions>
-//                   <Button size="small" onClick={() => navigate('/crowd-counting')}>
-//                     Go to Crowd Counting
-//                   </Button>
-//                 </CardActions>
-//               </Card>
-//             </Grid>
+//       <div className="max-w-7xl mx-auto px-4 py-8">
+//         <h1 className="text-4xl font-bold mb-6 my-14">Dashboard</h1>
 
-//             {/* Criminal Detection Card */}
-//             <Grid item xs={12} sm={6}>
-//               <Card>
-//                 <CardContent>
-//                   <Typography variant="h5" component="div">
-//                     Criminal Detection
-//                   </Typography>
-//                   <Typography variant="body2" color="text.secondary">
-//                     Navigate to the criminal detection component to monitor suspicious activities.
-//                   </Typography>
-//                 </CardContent>
-//                 <CardActions>
-//                   <Button size="small" onClick={() => navigate('/criminal-detection')}>
-//                     Go to Criminal Detection
-//                   </Button>
-//                 </CardActions>
-//               </Card>
-//             </Grid>
-//           </Grid>
-//         </Box>
-//       </Container>
+//         <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+//           {/* Crowd Counting Card */}
+//           <div className="bg-white rounded-lg shadow-md p-6">
+//             <h2 className="text-2xl font-semibold mb-4">Crowd Counting</h2>
+//             <p className="text-gray-600 mb-6">
+//               Access the crowd counting module using AI-based surveillance.
+//             </p>
+//             <button
+//               onClick={() => navigate('/crowd-counting')}
+//               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"
+//             >
+//               Go to Crowd Counting
+//             </button>
+//           </div>
+
+//           {/* Criminal Detection Card */}
+//           <div className="bg-white rounded-lg shadow-md p-6">
+//             <h2 className="text-2xl font-semibold mb-4">Criminal Detection</h2>
+//             <p className="text-gray-600 mb-6">
+//               Navigate to the criminal detection component to monitor suspicious activities.
+//             </p>
+//             <button
+//               onClick={() => navigate('/criminal-detection')}
+//               className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded"
+//             >
+//               Go to Criminal Detection
+//             </button>
+//           </div>
+//         </div>
+//       </div>
 //     </div>
 //   );
 // };
 
 // export default DashboardPage;
 
+
 import React from 'react';
-import { Container, Typography, Box, Card, CardContent, Button, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 
@@ -112,37 +56,54 @@ const DashboardPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="dashboard-page" style={{ backgroundColor: '#f0f0f0', minHeight: '100vh' }}>
+    <div className="bg-gray-100 min-h-screen w-full">
       <Navbar />
-      <Container maxWidth="lg">
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Dashboard
-          </Typography>
-          <Grid container spacing={4} mt={2}>
-            <Grid item xs={12} sm={6}>
-              <Card sx={{ p: 2 }}>
-                <CardContent>
-                  <Typography variant="h5">Crowd Counting</Typography>
-                  <Button variant="contained" color="primary" sx={{ mt: 2 }} onClick={() => navigate('/crowd-counting')}>
-                    Go to Crowd Counting
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Card sx={{ p: 2 }}>
-                <CardContent>
-                  <Typography variant="h5">Criminal Detection</Typography>
-                  <Button variant="contained" color="error" sx={{ mt: 2 }} onClick={() => navigate('/criminal-detection')}>
-                    Go to Criminal Detection
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      </Container>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        
+        {/* Dashboard Heading */}
+        <h1 className="text-5xl font-bold text-center mb-16 mt-10 p-5 text-gray-800">
+          Dashboard
+        </h1>
+
+        {/* Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          
+          {/* Crowd Counting Card */}
+          <div 
+            onClick={() => navigate('/crowd-counting')}
+            className="bg-white rounded-2xl shadow-md p-8 cursor-pointer transform transition-transform hover:scale-105 hover:shadow-xl"
+          >
+            <h2 className="text-3xl font-semibold mb-4 text-blue-700">Crowd Counting</h2>
+            <p className="text-gray-600 mb-6 text-lg">
+              Access the crowd counting module using AI-based surveillance technology.
+            </p>
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate('/crowd-counting'); }}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-full transition"
+            >
+              Go to Crowd Counting
+            </button>
+          </div>
+
+          {/* Criminal Detection Card */}
+          <div 
+            onClick={() => navigate('/criminal-detection')}
+            className="bg-white rounded-2xl shadow-md p-8 cursor-pointer transform transition-transform hover:scale-105 hover:shadow-xl"
+          >
+            <h2 className="text-3xl font-semibold mb-4 text-red-700">Criminal Detection</h2>
+            <p className="text-gray-600 mb-6 text-lg">
+              Navigate to the criminal detection system and monitor suspicious activities with live AI models.
+            </p>
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate('/criminal-detection'); }}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-full transition"
+            >
+              Go to Criminal Detection
+            </button>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 };
