@@ -45,30 +45,75 @@ function App() {
   }
 
   return (
+    // <Router>
+    //   <Routes>
+      
+    //     <Route 
+    //       path="/login" 
+    //       element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginForm />} 
+    //     />
+    //     <Route 
+    //       path="/dashboard" 
+    //       element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} 
+    //     />
+    //     <Route 
+    //       path="/" 
+    //       element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} 
+    //     />
+
+    //     <Route
+    //       path='/crowd-counting'
+    //       element={isAuthenticated ? <CrowdCountingPage/> : <Navigate to="/login" />}
+    //     />
+
+    //     <Route
+    //       path='/criminal-detection'
+    //       element={isAuthenticated ? <CriminalDetection/> : <Navigate to="/login" />}
+    //     />
+
+    //     <Route
+    //       path='/dummy'
+    //       element={<CriminalDetection />}
+    //     />
+
+    //     <Route 
+    //       path="/about" 
+    //       element={isAuthenticated ? <About /> : <Navigate to="/login" />} 
+    //     />
+
+    //     <Route 
+    //       path="/contact" 
+    //       element={isAuthenticated ? <Contact /> : <Navigate to="/login" />} 
+    //     />
+
+        
+
+    //   </Routes>
+    // </Router>
     <Router>
       <Routes>
       
-        <Route 
+        {/* <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginForm />} 
-        />
+        /> */}
         <Route 
           path="/dashboard" 
-          element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />} 
+          element={<DashboardPage />} 
         />
         <Route 
           path="/" 
-          element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} 
+          element={<Navigate to={ "/dashboard"} />} 
         />
 
         <Route
           path='/crowd-counting'
-          element={isAuthenticated ? <CrowdCountingPage/> : <Navigate to="/login" />}
+          element={<CrowdCountingPage />}
         />
 
         <Route
           path='/criminal-detection'
-          element={isAuthenticated ? <CriminalDetection/> : <Navigate to="/login" />}
+          element={<CriminalDetection/>}
         />
 
         <Route
@@ -78,12 +123,12 @@ function App() {
 
         <Route 
           path="/about" 
-          element={isAuthenticated ? <About /> : <Navigate to="/login" />} 
+          element={<About />} 
         />
 
         <Route 
           path="/contact" 
-          element={isAuthenticated ? <Contact /> : <Navigate to="/login" />} 
+          element={ <Contact />} 
         />
 
         

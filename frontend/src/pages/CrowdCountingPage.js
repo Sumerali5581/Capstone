@@ -115,30 +115,34 @@ const CrowdCountingPage = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const handleFileChange = (e) => {
     setVideoFile(e.target.files[0]);
     setShowResult(false); // Reset result if user selects a new file
   };
 
+
   const handleUpload = async () => {
     if (!videoFile) return;
-
+  
     const formData = new FormData();
     formData.append('video', videoFile);
-
+  
     setIsProcessing(true);
     setShowResult(false);
-
+    setIsStreaming(false);
+  
     try {
       const response = await fetch('http://localhost:5000/api/crowd-count/upload', {
         method: 'POST',
         body: formData,
       });
-
+  
       if (response.ok) {
         setIsProcessing(false);
         setShowResult(true);
+        setIsStreaming(true); // Start stream
       } else {
         alert('Upload failed');
         setIsProcessing(false);
@@ -149,6 +153,19 @@ const CrowdCountingPage = () => {
       setIsProcessing(false);
     }
   };
+  
+  const handleStopStream = async () => {
+    try {
+      await fetch('http://localhost:5000/api/crowd-count/stop', {
+        method: 'POST'
+      });
+      setIsStreaming(false);
+      setShowResult(false);  // Optionally hide the video stream
+    } catch (error) {
+      console.error('Failed to stop stream:', error);
+    }
+  };
+  
 
   return (
     <div className="bg-gray-100 min-h-screen pt-24 px-4">
@@ -173,8 +190,11 @@ const CrowdCountingPage = () => {
           <button
             onClick={handleUpload}
             disabled={!videoFile || isProcessing}
+            // className={`bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-full transition ${
+            //   (!videoFile || isProcessing) && 'opacity-50 cursor-not-allowed'
+            // }`}
             className={`bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-full transition ${
-              (!videoFile || isProcessing) && 'opacity-50 cursor-not-allowed'
+              (!videoFile || isProcessing) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
             {isProcessing ? 'Uploading...' : 'Upload Video'}
@@ -200,20 +220,41 @@ const CrowdCountingPage = () => {
           </div>
         )}
 
-        {/* Result Section */}
-        {showResult && (
-          <div className="mt-8">
-            <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">Crowd Counting in Progress...</h2>
-            <video
-              src="http://localhost:5000/api/crowd-count/video_feed"
-              controls
-              autoPlay
-              className="w-full rounded-lg shadow-lg"
-            >
-              Your browser does not support the video tag.
-            </video>
-          </div>
-        )}
+        {/* {showResult && (
+  <div className="mt-8">
+    <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">
+      Crowd Counting Stream
+    </h2>
+    <img
+      src="http://localhost:5000/api/crowd-count/video_feed"
+      alt="Live Crowd Detection Stream"
+      className="w-full rounded-lg shadow-lg"
+    />
+  </div>
+)} */}
+
+{showResult && (
+  <div className="mt-8">
+    <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">
+      Crowd Counting Stream
+    </h2>
+    <img
+      src={isStreaming ? "http://localhost:5000/api/crowd-count/video_feed" : ""}
+      alt="Live Crowd Detection Stream"
+      className="w-full rounded-lg shadow-lg"
+    />
+    <div className="flex justify-center mt-4">
+      <button
+        onClick={handleStopStream}
+        disabled={!isStreaming}
+        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-full transition"
+      >
+        Stop Stream
+      </button>
+    </div>
+  </div>
+)}
+
       </div>
     </div>
   );
