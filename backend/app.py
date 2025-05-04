@@ -71,10 +71,13 @@ otp_store = {}
 # ----------------------
 # Detection Setup
 UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER2 = 'uploads2'
 KNOWN_FOLDER = 'known_faces'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(KNOWN_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER2'] = UPLOAD_FOLDER2
+os.makedirs(UPLOAD_FOLDER2, exist_ok=True)
 app.config["ALLOWED_EXTENSIONS"] = {"mp4", "avi", "mov", "mkv"}
 app.config['OUTPUT_FOLDER'] = 'static'
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
@@ -103,145 +106,174 @@ tracker = sv.ByteTrack()
 
 # Global variable for uploaded video path
 crowd_video_path = None
+streaming = False 
 
 # Check if the uploaded file is allowed
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in app.config["ALLOWED_EXTENSIONS"]
 
+# def generate_frames_crowd():
+#     global video_path
+#     if video_path is None:
+#         return
 
-# @app.route("/api/crowd-count/upload", methods=["POST"])
-# def upload_crowd_video():
-#     global crowd_video_path
-#     if "video" not in request.files:
-#         return jsonify({"error": "No file part"}), 400
-#     file = request.files["video"]
-#     if file.filename == "":
-#         return jsonify({"error": "No selected file"}), 400
-#     if not allowed_file(file.filename):
-#         return jsonify({"error": "Invalid file type"}), 400
-#     filename = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-#     file.save(filename)
-#     crowd_video_path = filename
-#     threading.Thread(target=count_crowd, daemon=True).start()
-#     return jsonify({"message": "Video uploaded successfully"}), 200
+#     cap = cv2.VideoCapture(video_path)
 
-@app.route('/api/crowd-count/upload', methods=['POST'])
-def upload_video():
-    if 'video' not in request.files:
-        return jsonify({'error': 'No video part'}), 400
+#     while cap.isOpened():
+#         success, frame = cap.read()
+#         if not success:
+#             break
 
-    video = request.files['video']
-    if video.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+#         # Run YOLO model
+#         results = crowd_model(frame, conf=0.1)
+#         if isinstance(results, list):  # Ensure results is not a list
+#             results = results[0]
 
-    filename = secure_filename(video.filename)
-    input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    video.save(input_path)
+#         # Convert YOLO results into Supervision detections
+#         detections = sv.Detections.from_ultralytics(results)
 
-    # Process the video and save to OUTPUT_FOLDER as processed_output.mp4
-    output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'processed_output.mp4')
-    process_video(input_path, output_path)
+#         # Filter detections for 'person' class only (COCO class ID 0)
+#         person_detections = detections[detections.class_id == 0]  # ✅ Correct way
 
-    return jsonify({'message': 'Video processed successfully'}), 200
+#         # Ensure detections are passed correctly to tracker
+#         if len(person_detections) > 0:
+#             tracked_objects = tracker.update_with_detections(person_detections)
+#         else:
+#             tracked_objects = []
 
-def count_crowd():
-    global crowd_video_path
-    cap = cv2.VideoCapture(crowd_video_path)
+#         # Count number of people
+#         count = len(tracked_objects)
 
-    while cap.isOpened():
+#         # Draw bounding boxes only around people
+#         for obj in tracked_objects:
+#             x1, y1, x2, y2 = map(int, obj[0])  # Extract bbox
+#             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box for people
+
+#         # Display People Count
+#         cv2.putText(frame, f"People Count: {count}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+#         # Convert frame to JPEG format
+#         ret, buffer = cv2.imencode(".jpg", frame)
+#         frame = buffer.tobytes()
+
+#         yield (b'--frame\r\n'
+#                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+#     cap.release()
+
+def generate_frames_crowd():
+    global video_path, streaming
+
+    if video_path is None:
+        return
+
+    cap = cv2.VideoCapture(video_path)
+    streaming = True  # Set streaming to True when function starts
+
+    while cap.isOpened() and streaming:
         success, frame = cap.read()
         if not success:
             break
 
-        # Run YOLO model
         results = crowd_model(frame, conf=0.1)
         if isinstance(results, list):
             results = results[0]
 
-        # Convert YOLO results into Supervision detections
         detections = sv.Detections.from_ultralytics(results)
-
-        # Filter detections for 'person' class only (COCO class ID 0)
         person_detections = detections[detections.class_id == 0]
 
-        # Ensure detections are passed correctly to tracker
         if len(person_detections) > 0:
             tracked_objects = tracker.update_with_detections(person_detections)
         else:
             tracked_objects = []
 
-        # Count number of people
         count = len(tracked_objects)
 
-        # Draw bounding boxes
         for obj in tracked_objects:
-            x1, y1, x2, y2 = map(int, obj[0])  # Extract bbox
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box for people
+            x1, y1, x2, y2 = map(int, obj[0])
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-        # Display People Count
         cv2.putText(frame, f"People Count: {count}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-        # Save or display frame here for the frontend
-        # You can implement frame streaming as done in the criminal detection section
+        ret, buffer = cv2.imencode(".jpg", frame)
+        frame = buffer.tobytes()
+
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
     cap.release()
 
-# @app.route('/api/crowd-count/video_feed')
-# def crowd_video_feed():
-#     def generate_frames():
-#         global crowd_video_path
-#         cap = cv2.VideoCapture(crowd_video_path)
-#         while cap.isOpened():
-#             success, frame = cap.read()
-#             if not success:
-#                 break
-#             ret, buffer = cv2.imencode('.jpg', frame)
-#             frame = buffer.tobytes()
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-#         cap.release()
-#     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
+@app.route("/api/crowd-count/stop", methods=["POST"])
+def stop_stream():
+    global streaming
+    streaming = False
+    return jsonify({"message": "Stream stopped"}), 200
 
-# @app.route('/api/crowd-count/video_feed')
-# def crowd_video_feed():
-#     def generate_frames():
-#         while True:
-#             with crowd_lock:
-#                 if crowd_output_frame is None:
-#                     continue
-#                 ret, buffer = cv2.imencode('.jpg', crowd_output_frame)
-#                 frame = buffer.tobytes()
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-#     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-@app.route('/api/crowd-count/video_feed')
-def crowd_video_feed():
-    return send_from_directory(app.config['OUTPUT_FOLDER'], 'processed_output.mp4')
+@app.route("/api/crowd-count/upload", methods=["POST"])
+def upload_video():
+    global video_path
 
-def process_video(input_path, output_path):
-    cap = cv2.VideoCapture(input_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    if "video" not in request.files:
+        return jsonify({'error': 'No video file part'}), 400
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    file = request.files["video"]
+    if file.filename == "" or not allowed_file(file.filename):
+        return jsonify({'error': 'Invalid filename'}), 400
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    filename = secure_filename(file.filename)
+    video_path = os.path.join(app.config["UPLOAD_FOLDER2"], filename)
+    file.save(video_path)
 
-        # Example crowd counting logic (dummy counter here)
-        crowd_count = 42  # Replace with actual logic
-        cv2.putText(frame, f'Crowd Count: {crowd_count}', (50, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    return jsonify({'message': 'Upload successful'}), 200
 
-        out.write(frame)
+@app.route("/api/crowd-count/video_feed")
+def video_feed_crowd():
+    return Response(generate_frames_crowd(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-    cap.release()
-    out.release()
+
+# @app.route("/api/crowd-count/upload", methods=["GET", "POST"])
+# def index():
+#     global video_path
+
+#     if request.method == "POST":
+#         if "file" not in request.files:
+#             return redirect(request.url)
+
+#         file = request.files["file"]
+#         if file.filename == "" or not allowed_file(file.filename):
+#             return redirect(request.url)
+
+#         filename = secure_filename(file.filename)
+#         video_path = os.path.join(app.config["UPLOAD_FOLDER2"], filename)
+#         file.save(video_path)
+
+#         # return redirect(url_for("video_page"))
+#         return Response(generate_frames_crowd(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+#     return jsonify({'error': 'No video part'}), 400
+
+# @app.route('/api/crowd-count/upload', methods=['POST'])
+# def upload_video():
+#     if 'video' not in request.files:
+#         return jsonify({'error': 'No video part'}), 400
+
+#     video = request.files['video']
+#     if video.filename == '':
+#         return jsonify({'error': 'No selected file'}), 400
+
+#     filename = secure_filename(video.filename)
+#     input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+#     video.save(input_path)
+
+#     # Process the video and save to OUTPUT_FOLDER as processed_output.mp4
+#     output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'processed_output.mp4')
+#     process_video(input_path, output_path)
+
+#     return jsonify({'message': 'Video processed successfully'}), 200
+
+
+
 
 #------------------------------------
 
